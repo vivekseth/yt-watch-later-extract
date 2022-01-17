@@ -6,11 +6,22 @@
 var app = Application.currentApplication()
 app.includeStandardAdditions = true
 
-const DESKTOP_PATH = app.pathTo("desktop").toString()
+function getTempDir() {
+  let path = app.doShellScript("mktemp -d")
+  return path
+}
 
-const ENCODED_FILE_PATH = `${DESKTOP_PATH}/temp_watch_later.txt`
-const PYTHON_SCRIPT_PATH = `${DESKTOP_PATH}/decode.py`
-const DECODED_FILE_PATH = `${DESKTOP_PATH}/watch_later.txt`
+// The max time in seconds that the program should attempt to fetch new videos from youtube.
+// For me, the program takes ~7 minutes, but your time may vary depending on your network/computer speed.
+const MAX_RUNTIME = 900
+
+const YT_WATCH_LATER_URL = "https://www.youtube.com/playlist?app=desktop&list=WL"
+
+const BASE_DIR = getTempDir()
+const ENCODED_FILE_PATH = `${BASE_DIR}/__temp_watch_later.txt`
+const PYTHON_SCRIPT_PATH = `${BASE_DIR}/__decode.py`
+const DECODED_JSON_FILE_PATH = `${BASE_DIR}/watch_later.json`
+const DECODED_CSV_FILE_PATH = `${BASE_DIR}/watch_later.csv`
 
 const PY_SCRIPT = `
 import sys
@@ -54,18 +65,21 @@ def write_csv(data, path):
     file.close()
 
 input_path = sys.argv[1]
-output_path = sys.argv[2]
+json_output_path = sys.argv[2]
+csv_output_path = sys.argv[2]
 
 data = get_decoded_data(input_path)
-write_data(data, output_path)
-write_csv(data, output_path + '.csv')
+write_data(data, json_output_path)
+write_csv(data, csv_output_path)
 
 `
 
 
-const JS_FUNCS = `
+const JS_SCRIPT = `
 window.__YE__COMPLETE = false
 function isComplete() {
+  // AppleScript has issues dealing with plain boolean values
+  // Return a string to get a "truthy" value.
   return window.__YE__COMPLETE ? "complete" : null;
 }
 
@@ -127,6 +141,9 @@ function getJSONAsString() {
     return JSON.stringify(allData, null, 2)
 }
 
+// Periodically scrolls page down to trigger YouTube to fetch new videos
+// Once the function detects that no new videos are available, it sets the
+// flag __YE__COMPLETE to true.
 function startFetchingData() {
     console.log(new Date());
     window.__YE__COMPLETE = false
@@ -154,7 +171,7 @@ function startFetchingData() {
             })
         } else if (!isFirst) {
             let delta = date - prevRecord.date
-            // If count has not changed for 2 min
+            // If count has not changed for 1 min
             // there is probably no more data to fetch
             console.log(date, delta)
             if (delta > (60 * 1000)) {
@@ -191,14 +208,14 @@ function writeTextToFile(text, file, overwriteExistingContent) {
 
 function openWatchLaterPage(safariApp) {
   safariApp.make({'new': 'document', 'withProperties': {
-    'url': "https://www.youtube.com/playlist?app=desktop&list=WL"
+    'url': YT_WATCH_LATER_URL
   }})
 }
 
 function loadJSScripts(safariApp) {
   let window = safariApp.windows[0]
   let currentTab = window.currentTab
-  safariApp.doJavaScript(JS_FUNCS, {"in": currentTab})
+  safariApp.doJavaScript(JS_SCRIPT, {"in": currentTab})
 }
 
 function startFetch(safariApp) {
@@ -222,7 +239,20 @@ function awaitFetchComplete(safariApp) {
 function getEncodedOutput(safariApp) {
   let window = safariApp.windows[0]
   let currentTab = window.currentTab
+  // use encodeURI to ensure unicode characters are preserved as-is
+  // later we use python to decode the string back to unicode characters
   return safariApp.doJavaScript('encodeURI(getJSONAsString())', {"in": currentTab})
+}
+
+function finishedAlert() {
+  let body = `Extraction complete! Your watch later playlist is available here:\n\n${BASE_DIR}\n\nClick OK to open directory.`
+  app.displayDialog(body, {
+    'withTitle': "YouTube Watch Later Extractor"
+  })
+}
+
+function openOutputDirectory() {
+  app.doShellScript(`open ${BASE_DIR}`)
 }
 
 function main() {
@@ -238,13 +268,16 @@ function main() {
 	writeTextToFile(encodedOutput, ENCODED_FILE_PATH, true)
 
 	writeTextToFile(PY_SCRIPT, PYTHON_SCRIPT_PATH, true)
-    app.doShellScript(`python3 ${PYTHON_SCRIPT_PATH} ${ENCODED_FILE_PATH} ${DECODED_FILE_PATH}`)
+    app.doShellScript(`python3 ${PYTHON_SCRIPT_PATH} ${ENCODED_FILE_PATH} ${DECODED_JSON_FILE_PATH} ${DECODED_CSV_FILE_PATH}`)
 
-	// Clean up
-	app.doShellScript(`rm ${PYTHON_SCRIPT_PATH}`)
-	app.doShellScript(`rm ${ENCODED_FILE_PATH}`)
-	
-	app.say("Watch Later Playlist Extracted")
+	finishedAlert()
+    openOutputDirectory()
 }
 
-main()
+
+function main2() {
+  finishedAlert()
+  openOutputDirectory()
+}
+
+main2()
