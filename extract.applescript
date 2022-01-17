@@ -61,7 +61,7 @@ def write_csv(data, path):
 
 input_path = sys.argv[1]
 json_output_path = sys.argv[2]
-csv_output_path = sys.argv[2]
+csv_output_path = sys.argv[3]
 
 data = get_decoded_data(input_path)
 write_data(data, json_output_path)
@@ -201,28 +201,49 @@ function writeTextToFile(text, file, overwriteExistingContent) {
     }
 }
 
+function getWindowID(safariApp) {
+  let window = safariApp.windows[0]
+  let windowID = window.id()
+  return windowID
+}
+
+function getWindowFromID(safariApp, windowID) {
+  for (i=0; i<safariApp.windows.length; i++) {
+    let window = safariApp.windows[i]
+    if (windowID == window.id()) {
+	  return window
+	}
+  }
+
+  return null;
+}
+
 function openWatchLaterPage(safariApp) {
   safariApp.make({'new': 'document', 'withProperties': {
     'url': YT_WATCH_LATER_URL
   }})
+  delay(2)
+  return getWindowID(safariApp)
 }
 
-function loadJSScripts(safariApp) {
-  let window = safariApp.windows[0]
+function loadJSScripts(safariApp, windowID) {
+  // Wait a few sec to ensure page is loaded
+  delay(2)
+  let window = getWindowFromID(safariApp, windowID)
   let currentTab = window.currentTab
   safariApp.doJavaScript(JS_SCRIPT, {"in": currentTab})
 }
 
-function startFetch(safariApp) {
-  let window = safariApp.windows[0]
+function startFetch(safariApp, windowID) {
+  let window = getWindowFromID(safariApp, windowID)
   let currentTab = window.currentTab
   safariApp.doJavaScript("startFetchingData()", {"in": currentTab})
 }
 
-function awaitFetchComplete(safariApp) {
-  let window = safariApp.windows[0]
+function awaitFetchComplete(safariApp, windowID) {
+  let window = getWindowFromID(safariApp, windowID)
   let currentTab = window.currentTab
-  for (var i=0; i<600; i++) {
+  for (var i=0; i<MAX_RUNTIME; i++) {
     delay(1.0)
 	let isComplete = safariApp.doJavaScript("isComplete()", {"in": currentTab})
 	if (isComplete) {
@@ -231,8 +252,8 @@ function awaitFetchComplete(safariApp) {
   }
 }
 
-function getEncodedOutput(safariApp) {
-  let window = safariApp.windows[0]
+function getEncodedOutput(safariApp, windowID) {
+  let window = getWindowFromID(safariApp, windowID)
   let currentTab = window.currentTab
   // use encodeURI to ensure unicode characters are preserved as-is
   // later we use python to decode the string back to unicode characters
@@ -253,26 +274,35 @@ function openOutputDirectory() {
 function main() {
 	SafariApp = Application('Safari')
 
-	openWatchLaterPage(SafariApp)
-	delay(2)
-	loadJSScripts(SafariApp)
-	startFetch(SafariApp)
-	awaitFetchComplete(SafariApp)
-	let encodedOutput = getEncodedOutput(SafariApp)
+	let windowID = openWatchLaterPage(SafariApp)
+	
+	loadJSScripts(SafariApp, windowID)
+	startFetch(SafariApp, windowID)
+	awaitFetchComplete(SafariApp, windowID)
+	let encodedOutput = getEncodedOutput(SafariApp, windowID)
 
 	writeTextToFile(encodedOutput, ENCODED_FILE_PATH, true)
 
 	writeTextToFile(PY_SCRIPT, PYTHON_SCRIPT_PATH, true)
     app.doShellScript(`python3 ${PYTHON_SCRIPT_PATH} ${ENCODED_FILE_PATH} ${DECODED_JSON_FILE_PATH} ${DECODED_CSV_FILE_PATH}`)
+	
+	let window = getWindowFromID(SafariApp, windowID)
+    window.close()
 
 	finishedAlert()
     openOutputDirectory()
 }
 
-
 function main2() {
-  finishedAlert()
-  openOutputDirectory()
+  SafariApp = Application('Safari')
+  let windowID = openWatchLaterPage(SafariApp)
+
+  delay(2)
+  
+  let window = getWindowFromID(SafariApp, windowID)
+  delay(5)
+  window.close()
+  
 }
 
-main2()
+main()
