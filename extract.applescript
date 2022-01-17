@@ -109,7 +109,7 @@ function extractData(item) {
     let videoDurationString = safeDo(null, () => item.querySelector('.ytd-thumbnail-overlay-time-status-renderer#text').textContent.trim())
     let videoThumbnail = safeDo(null, () => item.querySelector('yt-img-shadow img').src)
     
-	let channelURL = safeDo(null, () => item.querySelector('.ytd-channel-name a').href)
+  	let channelURL = safeDo(null, () => item.querySelector('.ytd-channel-name a').href)
     let channelTitle = safeDo(null, () => item.querySelector('.ytd-channel-name a').textContent.trim())
 	
 	let videoDuration = parseDuration(videoDurationString)
