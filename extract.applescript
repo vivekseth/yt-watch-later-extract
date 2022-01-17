@@ -1,8 +1,3 @@
-// TODO: Specify output path
-// TODO: Request desktop permissions upfront
-// TODO: Maybe don't even save the JSON
-// TODO: Post alert when done
-
 var app = Application.currentApplication()
 app.includeStandardAdditions = true
 
@@ -12,7 +7,7 @@ function getTempDir() {
 }
 
 // The max time in seconds that the program should attempt to fetch new videos from youtube.
-// For me, the program takes ~7 minutes, but your time may vary depending on your network/computer speed.
+// For me, the program takes ~7 minutes (~420 sec), but your time may vary depending on your network/computer speed.
 const MAX_RUNTIME = 900
 
 const YT_WATCH_LATER_URL = "https://www.youtube.com/playlist?app=desktop&list=WL"
