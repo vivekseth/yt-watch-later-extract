@@ -69,7 +69,6 @@ write_csv(data, csv_output_path)
 
 `
 
-
 const JS_SCRIPT = `
 window.__YE__COMPLETE = false
 function isComplete() {
