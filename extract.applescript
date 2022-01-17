@@ -293,16 +293,4 @@ function main() {
     openOutputDirectory()
 }
 
-function main2() {
-  SafariApp = Application('Safari')
-  let windowID = openWatchLaterPage(SafariApp)
-
-  delay(2)
-  
-  let window = getWindowFromID(SafariApp, windowID)
-  delay(5)
-  window.close()
-  
-}
-
 main()
